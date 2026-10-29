@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOUJAZ Checker | منصة فحص التقارير الجامعية العراقية</title>
+    
+    <!-- Google Fonts: Cairo & Tajawal -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#0A111A',
+                            navy: '#102A43',
+                            navyLight: '#1E3A5F',
+                            orange: '#38BDF8',
+                            orangeHover: '#0EA5E9',
+                            cardBg: 'rgba(16, 42, 67, 0.4)',
+                            border: 'rgba(255, 255, 255, 0.08)'
+                        }
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                        tajawal: ['Tajawal', 'sans-serif']
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 12s linear infinite'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React and Babel CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Browser-side PDF and DOCX text extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.0/mammoth.browser.min.js"></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #0A111A;
+            color: #F0F4F8;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A111A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #102A43;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF8A00;
+        }
+
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(16, 42, 67, 0.35);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(20, 48, 77, 0.25);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(56, 189, 248, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.08);
+        }
+
+        .glow-orange {
+            box-shadow: 0 0 25px -5px rgba(56, 189, 248, 0.35);
+        }
+
+        /* Animated Progress Ring */
+        .radial-progress-circle {
+            transition: stroke-dashoffset 1.2s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Moujaz Checker: quiet animated background */
+        body { background: #091522; }
+        #root { position: relative; isolation: isolate; }
+        #root::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+            background: radial-gradient(circle at 12% 24%, rgba(56,189,248,.10), transparent 34%), radial-gradient(circle at 85% 72%, rgba(14,165,233,.075), transparent 36%), linear-gradient(160deg,#091522,#0a111a 65%,#0b1e30);
+            background-size: 135% 135%; animation: moujazAurora 20s ease-in-out infinite alternate; }
+        #root::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .18;
+            background-image: linear-gradient(rgba(105,185,235,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(105,185,235,.12) 1px,transparent 1px);
+            background-size: 46px 46px; mask-image: linear-gradient(to bottom,black,transparent 90%); }
+        @keyframes moujazAurora { 0% {background-position:0% 0%;filter:hue-rotate(0deg)} 100% {background-position:100% 80%;filter:hue-rotate(9deg)} }
+        @media(prefers-reduced-motion:reduce){#root::before{animation:none!important} .glass-card{transition:none!important}}
+        @media(max-width:640px){.glass-panel{backdrop-filter:blur(9px)} .glass-card{border-radius:14px} }
+    </style>
+<style>header.sticky, footer.border-t {display:none!important} html,body{overflow-x:hidden} body{margin:0}</style></head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-orange selection:text-slate-950">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Local, rules-based checks: no file is uploaded to a server.
+        const MAX_BYTES = 15 * 1024 * 1024;
+        const CHECK_LABELS = { formatting:'التنسيق والخطوط', cover:'صفحة الغلاف', references:'المصادر والمراجع', comprehensive:'هيكل التقرير' };
+        const normalize = (value) => (value || '').replace(/\s+/g, ' ').trim();
+        const contains = (text, expressions) => expressions.some(re => re.test(text));
+
+        async function extractReport(file, progress) {
+            const bytes = await file.arrayBuffer();
+            if (/\.pdf$/i.test(file.name)) {
+                if (!window.pdfjsLib) throw new Error('تعذر تحميل مكتبة PDF. تأكد من اتصال الإنترنت.');
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
+                if (doc.numPages > 100) throw new Error('الحد الأقصى للفحص 100 صفحة.');
+                const pages = [];
+                let textItems = [];
+                for (let i=1; i<=doc.numPages; i++) {
+                    const page = await doc.getPage(i);
+                    const content = await page.getTextContent();
+                    const items = content.items.filter(x => typeof x.str === 'string');
+                    pages.push(items.map(x=>x.str).join(' '));
+                    textItems = textItems.concat(items.map(x => ({fontSize: Math.round(Math.hypot(x.transform?.[0] || 0, x.transform?.[1] || 0)), text:x.str})));
+                    progress(Math.min(65, 10 + Math.round(i/doc.numPages*55)), `قراءة صفحة ${i} من ${doc.numPages}...`);
+                }
+                await doc.destroy();
+                return { text:pages.join('\n\n'), cover:pages[0] || '', pages:doc.numPages, textItems, kind:'pdf' };
+            }
+            if (/\.docx$/i.test(file.name)) {
+                if (!window.mammoth) throw new Error('تعذر تحميل مكتبة Word. تأكد من اتصال الإنترنت.');
+                const result = await window.mammoth.extractRawText({arrayBuffer:bytes});
+                progress(65, 'اكتمل استخراج النص من Word...');
+                return {text:result.value, cover:result.value.slice(0, 1600), pages:null, textItems:[], kind:'docx'};
+            }
+            throw new Error('الملفات المدعومة هي PDF وDOCX فقط.');
+        }
+
+        function inspectReport(report, selected) {
+            const full = normalize(report.text);
+            if (full.length < 80) throw new Error('ما قدرنا نستخرج نص كافي. إذا الملف PDF مصوّر، يحتاج OCR غير متوفر بهالنسخة.');
+            const cover = normalize(report.cover);
+            const sections = [], recommendations = [];
+            const addSection = (id, icon, tests) => {
+                const items = tests.map(t => ({type:t.ok ? 'pass' : t.level || 'warning', title:t.title, desc:t.desc}));
+                const penalty = items.reduce((n,t)=>n+(t.type==='error'?20:t.type==='warning'?12:0),0);
+                sections.push({id, title:CHECK_LABELS[id], icon, score:Math.max(0,100-penalty), items});
+                items.filter(t=>t.type!=='pass').forEach(t=>recommendations.push(t.desc));
+            };
+            if (selected.cover) {
+                addSection('cover','file-text',[
+                    {ok:contains(cover,[/جامعة|university/i,/كلية|college|faculty/i,/معهد|institute/i]),title:'اسم المؤسسة التعليمية',desc:'تأكد من كتابة اسم الجامعة أو الكلية أو المعهد في الغلاف.'},
+                    {ok:contains(cover,[/اسم الطالب|إعداد|اعداد|prepared by|student name|submitted by/i]),title:'بيانات الطالب',desc:'لم نرصد عبارة واضحة تدل على اسم الطالب أو مُعدّ التقرير في بداية الملف.'},
+                    {ok:contains(cover,[/إشراف|اشراف|supervised by|supervisor|instructor|الدكتور|الأستاذ|استاذ/i]),title:'اسم المشرف أو التدريسي',desc:'أضف اسم التدريسي أو المشرف إذا كانت كليتك تشترطه.'},
+                    {ok:contains(cover,[/20\d{2}|14\d{2}|السنة الدراسية|academic year/i]),title:'التاريخ أو السنة الدراسية',desc:'لم نرصد سنة دراسية أو تاريخاً واضحاً في بداية التقرير.'}
+                ]);
+            }
+            if (selected.comprehensive) {
+                addSection('comprehensive','layout',[
+                    {ok:contains(full,[/مقدمة|introduction|background/i]),title:'المقدمة',desc:'لم نعثر على عنوان مقدمة واضح. تأكد من وجود مقدمة مناسبة.'},
+                    {ok:contains(full,[/خاتمة|الاستنتاج|الاستنتاجات|conclusion|conclusions|summary/i]),title:'الخاتمة أو الاستنتاجات',desc:'لم نعثر على عنوان خاتمة أو استنتاجات واضح.'},
+                    {ok:full.length >= 900,title:'حجم المحتوى النصي',desc:'النص المستخرج قصير نسبياً؛ تأكد من اكتمال محتوى التقرير.'},
+                    {ok:!report.pages || report.pages >= 2,title:'عدد الصفحات',desc:'ملف PDF من صفحة واحدة؛ راجع متطلبات عدد الصفحات في المادة.'}
+                ]);
+            }
+            if (selected.references) {
+                const match = full.match(/(?:المصادر|المراجع|references|bibliography|works cited)/i);
+                const tail = match ? full.slice(Math.max(0,match.index)) : '';
+                addSection('references','book-open',[
+                    {ok:!!match,title:'قسم المصادر والمراجع',level:'error',desc:'لم نرصد عنوان قسم للمصادر أو المراجع.'},
+                    {ok:!match || /20\d{2}|19\d{2}|doi|https?:\/\/|\[\d+\]/i.test(tail),title:'معلومات توثيق أولية',desc:'قائمة المراجع لا تُظهر سنوات نشر أو روابط أو معرفات توثيق واضحة. راجع توثيق كل مصدر.'},
+                    {ok:!match || tail.length >= 70,title:'تفاصيل المراجع',desc:'قسم المراجع قصير جداً؛ تحقق من اكتمال أسماء المؤلفين والعناوين وبيانات النشر.'}
+                ]);
+            }
+            if (selected.formatting) {
+                const sizes = report.textItems.filter(x=>x.text.trim() && x.fontSize>=6 && x.fontSize<=50).map(x=>x.fontSize);
+                const common = sizes.length ? sizes.sort((a,b)=>a-b)[Math.floor(sizes.length/2)] : null;
+                addSection('formatting','type',[
+                    {ok:!!common,title:'إمكانية قراءة أحجام الخط',desc:common ? `حجم الخط الوسيط المستخرج تقريباً ${common}pt؛ راجع دليل كليتك.` : 'فحص حجم الخط غير متاح بدقة لهذا الملف. يتطلب فحصاً بصرياً أو قراءة تنسيق Word.'},
+                    {ok:!common || (common >= 9 && common <= 16),title:'حجم الخط الأساسي',desc:common ? `الحجم الوسيط ${common}pt وقد يحتاج مراجعة وفق تعليمات الكلية.` : 'لم يمكن قياس حجم الخط.'},
+                    {ok:!(/ {5,}/.test(report.text)),title:'المسافات الكبيرة في النص',desc:'لوحظت مسافات متكررة؛ راجع محاذاة الفقرات والمسافات يدوياً.'}
+                ]);
+            }
+            const all = sections.flatMap(s=>s.items);
+            const score = sections.length ? Math.round(sections.reduce((n,s)=>n+s.score,0)/sections.length) : 0;
+            return {score, statusText:score>=85?'مؤشرات جيدة — راجع الملاحظات':score>=65?'يحتاج بعض التحسينات':'يحتاج مراجعة قبل التسليم',summary:{errors:all.filter(i=>i.type==='error').length,warnings:all.filter(i=>i.type==='warning').length,passed:all.filter(i=>i.type==='pass').length},sections,recommendations:recommendations.slice(0,8),meta:`${report.pages ? report.pages+' صفحة · ' : ''}فحص قواعد نصية أولي، مو درجة جامعية رسمية. لا يشمل التحقق من صحة المصادر أو اكتشاف الانتحال أو تدقيق الصور.`};
+        }
+
+        // --- Main App Component ---
+        function App() {
+            const [currentPage, setCurrentPage] = useState('home'); // 'home', 'checker', 'results'
+            const [uploadedFile, setUploadedFile] = useState(null);
+            const [resultData, setResultData] = useState(null);
+            const [analysisError, setAnalysisError] = useState('');
+            const [options, setOptions] = useState({
+                formatting: true,
+                cover: true,
+                references: true,
+                comprehensive: true,
+                aiAnalysis: false
+            });
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [analysisProgress, setAnalysisProgress] = useState(0);
+            const [analysisStep, setAnalysisStep] = useState('');
+            const [activeResultTab, setActiveResultTab] = useState('all');
+
+            // Lucide Icon Helper
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [currentPage, isAnalyzing, activeResultTab, uploadedFile]);
+
+            // Scroll to top on page change
+            const navigateTo = (page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const handleFileDrop = (e) => {
+                e.preventDefault();
+                const files = e.dataTransfer ? e.dataTransfer.files : e.target.files;
+                if (!files || !files.length) return;
+                const file = files[0];
+                if (!/\.(pdf|docx)$/i.test(file.name)) { setAnalysisError('يرجى رفع PDF أو DOCX فقط. صيغة DOC القديمة غير مدعومة.'); return; }
+                if (file.size > MAX_BYTES) { setAnalysisError('الحد الأقصى لحجم الملف 15MB.'); return; }
+                setAnalysisError('');
+                setResultData(null);
+                setUploadedFile({file, name:file.name, size:(file.size/(1024*1024)).toFixed(2)+' ميغابايت', type:file.name.split('.').pop().toUpperCase()});
+            };
+
+            const startAnalysis = async () => {
+                if (!uploadedFile || isAnalyzing) return;
+                if (!Object.entries(options).some(([k,v])=>k!=='aiAnalysis' && v)) { setAnalysisError('اختر نوع فحص واحد على الأقل.'); return; }
+                setAnalysisError('');
+                try {
+                    const response = await fetch('/.netlify/functions/site-status', {cache:'no-store'});
+                    if (response.ok && (await response.json()).maintenance) {setAnalysisError('الفحص متوقف مؤقتاً للصيانة.');return;}
+                } catch (e) { /* Static preview can still run without backend */ }
+                setIsAnalyzing(true);
+                setAnalysisProgress(5);
+                setAnalysisStep('جاري استخراج محتوى التقرير داخل المتصفح...');
+                try {
+                    const extracted = await extractReport(uploadedFile.file, (p,label)=>{setAnalysisProgress(p);setAnalysisStep(label);});
+                    setAnalysisProgress(80);
+                    setAnalysisStep('مراجعة العناوين والغلاف والمراجع...');
+                    const checked = inspectReport(extracted, options);
+                    setResultData(checked);
+                    // Only send aggregate score; never upload file content or filename.
+                    fetch('/.netlify/functions/check-event', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'check_completed',score:checked.score})}).catch(()=>{});
+                    setAnalysisProgress(100);
+                    setCurrentPage('results');
+                    window.scrollTo({top:0,behavior:'smooth'});
+                } catch(err) {
+                    setAnalysisError(err.message || 'حدث خطأ أثناء قراءة الملف.');
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col justify-between bg-brand-bg text-slate-100 font-cairo">
+                    
+                    {/* Header / Navbar */}
+                    <header className="sticky top-0 z-50 glass-panel border-b border-white/10">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
+                            {/* Logo */}
+                            <div 
+                                onClick={() => navigateTo('home')} 
+                                className="flex items-center gap-3 cursor-pointer group"
+                            >
+                                <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-orange to-sky-300 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-brand-orange/20 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="zap" className="w-5 h-5" strokeWidth="2.5"></i>
+                                </div>
+                                <div>
+                                    <div className="text-sm sm:text-base font-extrabold tracking-tight flex items-center gap-1 text-white">
+                                        MOUJAZ <span className="text-brand-orange">Checker</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 tracking-wider">أداة فحص التقارير · موجز</p>
+                                </div>
+                            </div>
+
+                            {/* Nav Links */}
+                            <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-300">
+                                <button 
+                                    onClick={() => navigateTo('home')} 
+                                    className={`transition-colors hover:text-brand-orange ${currentPage === 'home' ? 'text-brand-orange font-bold' : ''}`}
+                                >
+                                    الرئيسية
+                                </button>
+                                <button 
+                                    onClick={() => navigateTo('checker')} 
+                                    className={`transition-colors hover:text-brand-orange ${currentPage === 'checker' ? 'text-brand-orange font-bold' : ''}`}
+                                >
+                                    فحص التقرير
+                                </button>
+                                {currentPage === 'results' && (
+                                    <button 
+                                        onClick={() => navigateTo('results')} 
+                                        className="text-brand-orange font-bold flex items-center gap-1"
+                                    >
+                                        <i data-lucide="bar-chart-2" className="w-4 h-4"></i>
+                                        نتائج الفحص
+                                    </button>
+                                )}
+                            </nav>
+
+                            {/* Telegram community link */}
+                            <a href="https://t.me/MOUJAZIQ" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-brand-orange/40 bg-brand-orange/10 text-brand-orange text-[11px] sm:text-xs font-bold hover:bg-brand-orange/20 transition-colors whitespace-nowrap">
+                                <i data-lucide="send" className="w-3.5 h-3.5"></i>
+                                انضم لقناتنا
+                            </a>
+                        </div>
+                    </header>
+
+                    {/* Main Content Dynamic View */}
+                    <main className="flex-grow">
+                        {currentPage === 'home' && <HomePage navigateTo={navigateTo} />}
+                        {currentPage === 'checker' && (
+                            <CheckerPage 
+                                uploadedFile={uploadedFile}
+                                setUploadedFile={setUploadedFile}
+                                handleFileDrop={handleFileDrop}
+                                options={options}
+                                setOptions={setOptions}
+                                startAnalysis={startAnalysis}
+                                isAnalyzing={isAnalyzing}
+                                analysisProgress={analysisProgress}
+                                analysisStep={analysisStep}
+                                analysisError={analysisError}
+                            />
+                        )}
+                        {currentPage === 'results' && (
+                            <ResultsPage 
+                                uploadedFile={uploadedFile}
+                                resultData={resultData}
+                                navigateTo={navigateTo}
+                                activeTab={activeResultTab}
+                                setActiveTab={setActiveResultTab}
+                            />
+                        )}
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-white/10 bg-slate-950/80 pt-12 pb-8 mt-16 text-slate-400">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+                                <div className="space-y-4 md:col-span-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-brand-orange flex items-center justify-center text-slate-950 font-bold text-sm">
+                                            <i data-lucide="zap" className="w-5 h-5" strokeWidth="2.5"></i>
+                                        </div>
+                                        <span className="font-extrabold text-white text-lg">MOUJAZ Checker</span>
+                                    </div>
+                                    <p className="text-sm leading-relaxed text-slate-400">
+                                        أداة مساعدة لفحص المؤشرات النصية الأساسية في التقارير الجامعية. النتائج إرشادية ولا تحل محل تعليمات التدريسي.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-bold text-white mb-4 text-base">روابط سريعة</h4>
+                                    <ul className="space-y-2.5 text-sm">
+                                        <li><button onClick={() => navigateTo('home')} className="hover:text-brand-orange transition-colors">الرئيسية</button></li>
+                                        <li><button onClick={() => navigateTo('checker')} className="hover:text-brand-orange transition-colors">بدء فحص جديد</button></li>
+                                        <li><a href="#how-it-works" onClick={() => navigateTo('home')} className="hover:text-brand-orange transition-colors">طريقة العمل</a></li>
+                                        <li><a href="#features" onClick={() => navigateTo('home')} className="hover:text-brand-orange transition-colors">المميزات والمعايير</a></li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-bold text-white mb-4 text-base">معايير الجامعات</h4>
+                                    <ul className="space-y-2.5 text-sm text-slate-400">
+                                        <li className="flex items-center gap-2">
+                                            <i data-lucide="check" className="w-3.5 h-3.5 text-brand-orange"></i>
+                                            مؤشرات عامة للغلاف
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <i data-lucide="check" className="w-3.5 h-3.5 text-brand-orange"></i>
+                                            وجود مقدمة وخاتمة
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <i data-lucide="check" className="w-3.5 h-3.5 text-brand-orange"></i>
+                                            وجود قائمة مراجع
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <i data-lucide="check" className="w-3.5 h-3.5 text-brand-orange"></i>
+                                            تختلف الشروط حسب الكلية
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-bold text-white mb-4 text-base">دعم مستمر</h4>
+                                    <p className="text-sm text-slate-400 mb-4">
+                                        الفحص يعتمد مؤشرات عامة قابلة للتطوير، وليس اعتماداً رسمياً من وزارة التعليم العالي أو الجامعات.
+                                    </p>
+                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-navy border border-brand-border text-xs text-brand-orange">
+                                        <i data-lucide="shield-check" className="w-4 h-4"></i>
+                                        <span>نسخة 2026 - فحص نصي تجريبي</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 mb-7 rounded-2xl border border-brand-orange/20 bg-brand-navy/30 p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-right">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-11 h-11 shrink-0 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange">
+                                        <i data-lucide="message-circle-warning" className="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-white font-bold text-sm">تواصل مع المطوّر • الإبلاغ عن الأخطاء</h4>
+                                        <p className="text-slate-400 text-xs mt-1">عندك استفسار أو واجهتك مشكلة بالموقع؟ راسلنا على تيليگرام.</p>
+                                    </div>
+                                </div>
+                                <a href="https://t.me/qztuu" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-orange hover:bg-brand-orangeHover text-slate-950 font-extrabold text-sm px-5 py-3 transition-colors whitespace-nowrap">
+                                    <i data-lucide="send" className="w-4 h-4"></i>
+                                    <span>راسل @qztuu</span>
+                                </a>
+                            </div>
+
+                            <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
+                                <div>
+                                    جميع الحقوق محفوظة © 2026 MOUJAZ Checker
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <span className="hover:text-slate-300 transition-colors cursor-pointer">الشروط والأحكام</span>
+                                    <span className="hover:text-slate-300 transition-colors cursor-pointer">خصوصية الملفات والتقارير</span>
+                                    <a href="https://t.me/qztuu" target="_blank" rel="noopener noreferrer" className="hover:text-brand-orange transition-colors">تواصل معنا</a>
+                                </div>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 1. HOME PAGE COMPONENT
+        // ==========================================
+        function HomePage({ navigateTo }) {
+            return (
+                <div className="space-y-14 sm:space-y-20 py-4">
+                    {/* Hero Section */}
+                    <section className="relative overflow-hidden pt-8 sm:pt-12 pb-12 sm:pb-16">
+                        {/* Background Glow Accents */}
+                        <div className="absolute top-1/4 right-1/2 translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-brand-orange/10 rounded-full blur-[120px] pointer-events-none"></div>
+                        <div className="absolute top-1/3 left-10 w-[300px] h-[300px] bg-brand-navyLight/30 rounded-full blur-[90px] pointer-events-none"></div>
+
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+                            
+                            {/* Iraqi Tech Badge */}
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-navy/80 border border-brand-border text-slate-300 text-xs font-semibold mb-5 backdrop-blur-md">
+                                <span className="flex h-2 w-2 rounded-full bg-brand-orange animate-pulse"></span>
+                                <span>أداة إرشادية لطلبة الجامعات والمعاهد العراقية 🇮🇶</span>
+                            </div>
+
+                            {/* Main Title */}
+                            <h1 className="text-[clamp(1.65rem,5.4vw,3.3rem)] font-black text-white tracking-tight leading-[1.5] mb-4">
+                                تقريرك الجامعي يستحق <br className="hidden sm:inline" />
+                                <span className="bg-clip-text text-transparent bg-gradient-to-l from-brand-orange via-sky-200 to-white">
+                                    مراجعة أذكى وأسرع
+                                </span>
+                            </h1>
+
+                            {/* Subtitle */}
+                            <p className="max-w-2xl mx-auto text-sm sm:text-base text-slate-300 font-normal leading-[2] mb-7">
+                                افحص تقريرك بصيغة <span className="text-white font-semibold">PDF</span> أو <span className="text-white font-semibold">DOCX</span> قبل تسليمه للكلية. اكتشف الأخطاء التنسيقية، نقص صفحة الغلاف، والمراجع غير الموثقة حسب حجم الملف.
+                            </p>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-sm mx-auto">
+                                <button 
+                                    onClick={() => navigateTo('checker')}
+                                    className="w-full sm:w-auto bg-brand-orange hover:bg-brand-orangeHover text-slate-950 font-extrabold text-sm px-5 py-3 rounded-xl shadow-xl shadow-brand-orange/25 hover:shadow-brand-orange/40 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
+                                >
+                                    <i data-lucide="file-check" className="w-4 h-4"></i>
+                                    <span>افحص تقريرك الآن</span>
+                                </button>
+                                <a 
+                                    href="#how-it-works"
+                                    className="w-full sm:w-auto glass-card text-white hover:bg-white/10 font-bold text-sm px-5 py-3 rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2"
+                                >
+                                    <span>طريقة العمل</span>
+                                    <i data-lucide="arrow-down" className="w-4 h-4"></i>
+                                </a>
+                                <a href="https://t.me/MOUJAZIQ" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto glass-card text-brand-orange hover:bg-brand-orange/10 font-bold text-sm px-5 py-3 rounded-xl transition-all border border-brand-orange/30 flex items-center justify-center gap-2">
+                                    <i data-lucide="send" className="w-4 h-4"></i>
+                                    <span>قناتنا على تليگرام</span>
+                                </a>
+                            </div>
+
+                            {/* Stat/Trust Badges */}
+                            <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto text-center">
+                                <div className="p-4 rounded-2xl glass-card">
+                                    <div className="text-2xl sm:text-3xl font-black text-white">—</div>
+                                    <div className="text-xs text-slate-400 mt-1">فحص إرشادي وفق مؤشرات عامة</div>
+                                </div>
+                                <div className="p-4 rounded-2xl glass-card">
+                                    <div className="text-2xl sm:text-3xl font-black text-brand-orange">PDF / DOCX</div>
+                                    <div className="text-xs text-slate-400 mt-1">صيغ الملفات المدعومة</div>
+                                </div>
+                                <div className="p-4 rounded-2xl glass-card">
+                                    <div className="text-2xl sm:text-3xl font-black text-white">محلي</div>
+                                    <div className="text-xs text-slate-400 mt-1">الفحص داخل متصفحك</div>
+                                </div>
+                                <div className="p-4 rounded-2xl glass-card">
+                                    <div className="text-2xl sm:text-3xl font-black text-brand-orange">بدون رفع</div>
+                                    <div className="text-xs text-slate-400 mt-1">الملفات لا تُرسل إلى خادمنا</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* How It Works Section */}
+                    <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 scroll-mt-24">
+                        <div className="text-center max-w-2xl mx-auto mb-16">
+                            <h2 className="text-xs font-extrabold text-brand-orange tracking-widest uppercase mb-2">خطوات متسلسلة</h2>
+                            <h3 className="text-xl sm:text-2xl font-extrabold text-white">كيف يعمل MOUJAZ Checker؟</h3>
+                            <p className="text-slate-400 mt-3 text-sm sm:text-base">ثلاث خطوات بسيطة تساعدك على مراجعة بعض عناصر التقرير قبل التسليم.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            {/* Step 1 */}
+                            <div className="glass-card p-8 rounded-3xl relative overflow-hidden group">
+                                <div className="w-14 h-14 rounded-2xl bg-brand-navy border border-brand-orange/30 flex items-center justify-center text-brand-orange font-black text-2xl mb-6 group-hover:scale-110 transition-transform">
+                                    1
+                                </div>
+                                <h4 className="text-xl font-bold text-white mb-3">ارفع ملف التقرير</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    قم بسحب وإسقاط ملف التقرير الجامعي بصيغة PDF أو Word (.docx). تُقرأ الملفات محلياً داخل المتصفح ولا تُرفع لخادم الموقع.
+                                </p>
+                            </div>
+
+                            {/* Step 2 */}
+                            <div className="glass-card p-8 rounded-3xl relative overflow-hidden group">
+                                <div className="w-14 h-14 rounded-2xl bg-brand-navy border border-brand-orange/30 flex items-center justify-center text-brand-orange font-black text-2xl mb-6 group-hover:scale-110 transition-transform">
+                                    2
+                                </div>
+                                <h4 className="text-xl font-bold text-white mb-3">حدد خيارات التحليل</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    اختر نوع التدقيق المطلوبة: التنسيق العام، صفحة الغلاف الرسمية، فحص مؤشرات المصادر وهيكل التقرير. التحليل بالذكاء الاصطناعي غير متاح حالياً.
+                                </p>
+                            </div>
+
+                            {/* Step 3 */}
+                            <div className="glass-card p-8 rounded-3xl relative overflow-hidden group">
+                                <div className="w-14 h-14 rounded-2xl bg-brand-navy border border-brand-orange/30 flex items-center justify-center text-brand-orange font-black text-2xl mb-6 group-hover:scale-110 transition-transform">
+                                    3
+                                </div>
+                                <h4 className="text-xl font-bold text-white mb-3">استلم النتيجة والتوصيات</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    احصل على تقييم شامل من 100 مع قائمة تفصيلية بالأخطاء التقنية والملاحظات والتوصيات المباشرة للتعديل.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Features Section */}
+                    <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 scroll-mt-24">
+                        <div className="text-center max-w-2xl mx-auto mb-16">
+                            <h2 className="text-xs font-extrabold text-brand-orange tracking-widest uppercase mb-2">مميزات الفحص</h2>
+                            <h3 className="text-xl sm:text-2xl font-extrabold text-white">كل ما يحتاجه الطالب الجامعي في مكان واحد</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange mb-4">
+                                    <i data-lucide="layout" className="w-6 h-6"></i>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-2">تدقيق التنسيق والخطوط</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    فحص أولي لحجم الخط في PDF وبعض مؤشرات النص؛ لا يمكن التحقق من جميع تفاصيل التنسيق تلقائياً.
+                                </p>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange mb-4">
+                                    <i data-lucide="award" className="w-6 h-6"></i>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-2">فحص صفحة الغلاف العراقية</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    التحقق من وجود كلمات تدل على الجامعة والطالب والمشرف والتاريخ في بداية الملف؛ فحص الشعار بصرياً غير متاح.
+                                </p>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange mb-4">
+                                    <i data-lucide="book-open" className="w-6 h-6"></i>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-2">مراجعة المصادر والمراجع</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    التحقق من وجود قسم مراجع ومؤشرات توثيق أولية؛ لا يجري فتح الروابط أو التحقق من صحة المراجع.
+                                </p>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange mb-4">
+                                    <i data-lucide="sparkles" className="w-6 h-6"></i>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-2">مراجعة الهيكل النصي</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    التحقق من وجود عناوين مثل المقدمة والخاتمة والاستنتاجات، دون تحليل دلالي بالذكاء الاصطناعي.
+                                </p>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange mb-4">
+                                    <i data-lucide="zap" className="w-6 h-6"></i>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-2">نتيجة إرشادية سريعة</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    حساب مؤشر إرشادي من 100 اعتماداً على الاختبارات المحددة؛ لا يتنبأ بدرجة التدريسي.
+                                </p>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="w-12 h-12 rounded-xl bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange mb-4">
+                                    <i data-lucide="lock" className="w-6 h-6"></i>
+                                </div>
+                                <h4 className="text-lg font-bold text-white mb-2">خصوصية الملفات</h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    قراءة الملفات داخل المتصفح فقط؛ لا يرفع الموقع الملفات إلى خادم.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Bottom Banner CTA */}
+                    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="glass-panel p-10 sm:p-14 rounded-3xl text-center relative overflow-hidden border border-brand-orange/30">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/10 rounded-full blur-3xl pointer-events-none"></div>
+                            
+                            <h3 className="text-xl sm:text-2xl font-extrabold text-white mb-4">جاهز لتحسين درجة تقريرك القادم؟</h3>
+                            <p className="text-slate-300 max-w-xl mx-auto text-sm sm:text-base mb-8">
+                                لا تجعل أخطاء التنسيق البسيطة تضيع جهدك في إعداد التقرير. افحص ملفك الآن مجاناً.
+                            </p>
+
+                            <button 
+                                onClick={() => navigateTo('checker')}
+                                className="bg-brand-orange hover:bg-brand-orangeHover text-slate-950 font-black px-5 py-3 rounded-xl text-sm shadow-xl shadow-brand-orange/30 transition-all"
+                            >
+                                بدء الفحص المجاني الآن
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 2. CHECKER PAGE COMPONENT
+        // ==========================================
+        function CheckerPage({ 
+            uploadedFile, 
+            setUploadedFile, 
+            handleFileDrop, 
+            options, 
+            setOptions, 
+            startAnalysis, 
+            isAnalyzing, 
+            analysisProgress, 
+            analysisStep,
+            analysisError
+        }) {
+            const fileInputRef = useRef(null);
+
+            const toggleOption = (key) => {
+                setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+            };
+
+            return (
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+                    
+                    {/* Header Title */}
+                    <div className="text-center max-w-2xl mx-auto space-y-3">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-navy border border-brand-border text-brand-orange text-xs font-semibold">
+                            <i data-lucide="file-text" className="w-3.5 h-3.5"></i>
+                            <span>منطقة رفع الملف والتكفيات</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-black text-white">رفع وفحص التقرير الجامعي</h1>
+                        <p className="text-slate-400 text-sm">قم برفع الملف ثم حدد معايير التدقيق التي ترغب بتطبيقها على تقريرك.</p>
+                    </div>
+
+                    {/* Main Checker Box */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        
+                        {/* Left/Main Column: Upload Area & Loading State */}
+                        <div className="lg:col-span-7 space-y-6">
+                            
+                            {/* Drag & Drop Zone */}
+                            {!isAnalyzing ? (
+                                <div className="space-y-4">
+                                    <div 
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={handleFileDrop}
+                                        onClick={() => fileInputRef.current.click()}
+                                        className={`glass-panel p-8 sm:p-12 rounded-3xl border-2 border-dashed text-center cursor-pointer transition-all duration-300 group ${
+                                            uploadedFile 
+                                                ? 'border-brand-orange/60 bg-brand-navy/50' 
+                                                : 'border-slate-700 hover:border-brand-orange/50 hover:bg-brand-navy/30'
+                                        }`}
+                                    >
+                                        <input 
+                                            type="file" 
+                                            ref={fileInputRef} 
+                                            onChange={handleFileDrop} 
+                                            accept=".pdf,.docx" 
+                                            className="hidden" 
+                                        />
+
+                                        {uploadedFile ? (
+                                            <div className="space-y-4">
+                                                <div className="w-16 h-16 rounded-2xl bg-brand-orange/20 text-brand-orange flex items-center justify-center mx-auto border border-brand-orange/40">
+                                                    <i data-lucide="file-check-2" className="w-8 h-8"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-white break-all">{uploadedFile.name}</h3>
+                                                    <p className="text-xs text-slate-400 mt-1">الحجم: {uploadedFile.size} | الصيغة: {uploadedFile.type}</p>
+                                                </div>
+                                                <div className="pt-2">
+                                                    <span className="text-xs text-brand-orange underline hover:text-white">انقر هنا لتغيير الملف</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div className="w-16 h-16 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto group-hover:text-brand-orange group-hover:bg-brand-navy transition-colors">
+                                                    <i data-lucide="upload-cloud" className="w-8 h-8"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-white mb-1">اسحب ملف التقرير هنا أو اضغط للاختيار</h3>
+                                                    <p className="text-xs text-slate-400">يدعم PDF وWord (.docx) حتى 15MB · الفحص يتم داخل متصفحك</p>
+                                                </div>
+                                                <div className="inline-block px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold group-hover:bg-brand-orange group-hover:text-slate-950 transition-colors">
+                                                    استعراض الملفات
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* File Status Bar */}
+                                    {uploadedFile && (
+                                        <div className="p-4 rounded-xl glass-card flex items-center justify-between text-xs text-slate-300">
+                                            <div className="flex items-center gap-2">
+                                                <i data-lucide="shield-check" className="w-4 h-4 text-emerald-400"></i>
+                                                <span>الملف جاهز للتحليل والفحص الفوري</span>
+                                            </div>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setUploadedFile(null); }}
+                                                className="text-rose-400 hover:text-rose-300 font-semibold"
+                                            >
+                                                حذف
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                /* Loading & Analysis Progress Animation UI */
+                                <div className="glass-panel p-8 sm:p-12 rounded-3xl text-center space-y-8 border border-brand-orange/40">
+                                    <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+                                        <div className="absolute inset-0 rounded-full border-4 border-slate-800"></div>
+                                        <div className="absolute inset-0 rounded-full border-4 border-brand-orange border-t-transparent animate-spin"></div>
+                                        <i data-lucide="cpu" className="w-10 h-10 text-brand-orange animate-pulse"></i>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h3 className="text-xl font-bold text-white">جاري تحليل التقرير بواسطة المساعد الذكي...</h3>
+                                        <p className="text-xs text-brand-orange font-semibold">{analysisStep}</p>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="space-y-2">
+                                        <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden p-0.5">
+                                            <div 
+                                                className="h-full bg-gradient-to-r from-sky-500 to-brand-orange rounded-full transition-all duration-500"
+                                                style={{ width: `${analysisProgress}%` }}
+                                            ></div>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-400 font-mono">
+                                            <span>التقدم</span>
+                                            <span>{analysisProgress}%</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-slate-500 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+                                        يرجى الانتظار، جاري التدقيق في كافة العناوين، الغلاف، وقائمة المصادر...
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Right Column: Check Options */}
+                        <div className="lg:col-span-5 space-y-6">
+                            <div className="glass-panel p-6 rounded-3xl space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white mb-1">خيارات التدقيق المطلوب</h3>
+                                    <p className="text-xs text-slate-400">حدد المعايير التي تريد التركيز عليها أثناء الفحص</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <OptionToggle 
+                                        id="formatting"
+                                        title="التنسيق والخطوط"
+                                        desc="فحص مؤشرات الخط والنص المتاحة"
+                                        checked={options.formatting}
+                                        onChange={() => toggleOption('formatting')}
+                                        disabled={isAnalyzing}
+                                    />
+                                    <OptionToggle 
+                                        id="cover"
+                                        title="صفحة الغلاف الرسمية"
+                                        desc="فحص بيانات الغلاف نصياً بشكل أولي"
+                                        checked={options.cover}
+                                        onChange={() => toggleOption('cover')}
+                                        disabled={isAnalyzing}
+                                    />
+                                    <OptionToggle 
+                                        id="references"
+                                        title="المصادر والمراجع"
+                                        desc="التحقق من وجود المراجع ومؤشرات توثيق"
+                                        checked={options.references}
+                                        onChange={() => toggleOption('references')}
+                                        disabled={isAnalyzing}
+                                    />
+                                    <OptionToggle 
+                                        id="comprehensive"
+                                        title="هيكل التقرير والفقرات"
+                                        desc="التحقق من وجود المقدمة والخاتمة وحجم المحتوى"
+                                        checked={options.comprehensive}
+                                        onChange={() => toggleOption('comprehensive')}
+                                        disabled={isAnalyzing}
+                                    />
+                                    <OptionToggle 
+                                        id="aiAnalysis"
+                                        title="تحليل الذكاء الاصطناعي (قريباً)"
+                                        desc="غير متاح في النسخة المجانية الحالية"
+                                        checked={false}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                    />
+                                </div>
+
+                                {analysisError && <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">{analysisError}</div>}
+                                <button 
+                                    onClick={startAnalysis}
+                                    disabled={!uploadedFile || isAnalyzing}
+                                    className={`w-full py-4 rounded-xl font-extrabold text-base transition-all flex items-center justify-center gap-2 ${
+                                        uploadedFile && !isAnalyzing
+                                            ? 'bg-brand-orange hover:bg-brand-orangeHover text-slate-950 shadow-lg shadow-brand-orange/25' 
+                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                    }`}
+                                >
+                                    <i data-lucide="play" className="w-5 h-5 fill-current"></i>
+                                    <span>{isAnalyzing ? 'جاري الفحص...' : 'ابدأ الفحص الآن'}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        }
+
+        // Toggle Option Helper Component
+        function OptionToggle({ id, title, desc, checked, onChange, disabled }) {
+            return (
+                <div 
+                    onClick={() => !disabled && onChange()}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                        checked 
+                            ? 'bg-brand-navy/60 border-brand-orange/40 text-white' 
+                            : 'bg-slate-900/40 border-slate-800 text-slate-400 opacity-60'
+                    }`}
+                >
+                    <div className="space-y-0.5">
+                        <div className="text-sm font-bold">{title}</div>
+                        <div className="text-[11px] text-slate-400">{desc}</div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${
+                        checked ? 'bg-brand-orange border-brand-orange text-slate-950' : 'border-slate-600'
+                    }`}>
+                        {checked && <i data-lucide="check" className="w-3.5 h-3.5 stroke-[3]"></i>}
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 3. RESULTS PAGE COMPONENT
+        // ==========================================
+        function ResultsPage({ uploadedFile, resultData, navigateTo, activeTab, setActiveTab }) {
+            const data = resultData;
+            if (!data) return <div className="max-w-3xl mx-auto p-10 text-center">ماكو نتائج بعد. <button className="text-brand-orange underline" onClick={() => navigateTo('checker')}>افحص تقرير</button></div>;
+
+            // Radial progress calculation
+            const radius = 52;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference - (data.score / 100) * circumference;
+
+            return (
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+                    
+                    {/* Top Action Header */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-white/10">
+                        <div>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-2">
+                                <i data-lucide="check-circle" className="w-3.5 h-3.5"></i>
+                                <span>اكتمل الفحص الإرشادي</span>
+                            </div>
+                            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">نتائج الفحص الإرشادي</h1>
+                            <p className="text-xs text-slate-400 mt-1">
+                                الملف المستهدف: <span className="text-brand-orange font-semibold">{uploadedFile ? uploadedFile.name : 'تقرير_جامعي_مراجعة.pdf'}</span>
+                            </p>
+                        </div>
+
+                        <button 
+                            onClick={() => navigateTo('checker')}
+                            className="glass-card text-white hover:bg-white/10 font-bold px-5 py-2.5 rounded-xl border border-white/10 text-sm flex items-center gap-2 transition-colors"
+                        >
+                            <i data-lucide="rotate-ccw" className="w-4 h-4"></i>
+                            <span>فحص تقرير جديد</span>
+                        </button>
+                    </div>
+
+                    {/* Overall Score & Stats Row */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        
+                        {/* Score Circle Card */}
+                        <div className="lg:col-span-5 glass-panel p-8 rounded-3xl flex flex-col items-center justify-center text-center border border-brand-orange/30 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 rounded-full blur-2xl"></div>
+
+                            <div className="relative w-36 h-36 mb-4 flex items-center justify-center">
+                                <svg className="w-full h-full" viewBox="0 0 120 120">
+                                    <circle
+                                        cx="60"
+                                        cy="60"
+                                        r={radius}
+                                        className="text-slate-800"
+                                        strokeWidth="10"
+                                        stroke="currentColor"
+                                        fill="transparent"
+                                    />
+                                    <circle
+                                        cx="60"
+                                        cy="60"
+                                        r={radius}
+                                        className="text-brand-orange radial-progress-circle"
+                                        strokeWidth="10"
+                                        strokeDasharray={circumference}
+                                        strokeDashoffset={strokeDashoffset}
+                                        strokeLinecap="round"
+                                        stroke="currentColor"
+                                        fill="transparent"
+                                    />
+                                </svg>
+                                <div className="absolute flex flex-col items-center justify-center text-center">
+                                    <span className="text-4xl font-black text-white">{data.score}</span>
+                                    <span className="text-[10px] text-slate-400 font-bold">من 100</span>
+                                </div>
+                            </div>
+
+                            <h3 className="text-xl font-bold text-white mb-1">{data.statusText}</h3>
+                            <p className="text-xs text-slate-400 max-w-xs">{data.meta}</p>
+                        </div>
+
+                        {/* Breakdown Summary Cards */}
+                        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="glass-card p-6 rounded-2xl border-l-4 border-l-rose-500 flex flex-col justify-between">
+                                <div className="flex justify-between items-center text-rose-400">
+                                    <span className="text-xs font-bold">مشكلات مرصودة</span>
+                                    <i data-lucide="alert-circle" className="w-5 h-5"></i>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="text-3xl font-black text-white">{data.summary.errors}</div>
+                                    <div className="text-[11px] text-slate-400 mt-1">تحتاج مراجعة</div>
+                                </div>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl border-l-4 border-l-amber-500 flex flex-col justify-between">
+                                <div className="flex justify-between items-center text-amber-400">
+                                    <span className="text-xs font-bold">تنبيهات وملاحظات</span>
+                                    <i data-lucide="alert-triangle" className="w-5 h-5"></i>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="text-3xl font-black text-white">{data.summary.warnings}</div>
+                                    <div className="text-[11px] text-slate-400 mt-1">تحسينات مستحسنة</div>
+                                </div>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl border-l-4 border-l-emerald-500 flex flex-col justify-between">
+                                <div className="flex justify-between items-center text-emerald-400">
+                                    <span className="text-xs font-bold">عناصر مستوفاة</span>
+                                    <i data-lucide="check-circle-2" className="w-5 h-5"></i>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="text-3xl font-black text-white">{data.summary.passed}</div>
+                                    <div className="text-[11px] text-slate-400 mt-1">مطابقة للشروط</div>
+                                </div>
+                            </div>
+
+                            {/* Recommendations Banner */}
+                            <div className="sm:col-span-3 glass-panel p-6 rounded-2xl border border-white/10">
+                                <div className="flex items-center gap-2 text-brand-orange font-bold text-sm mb-3">
+                                    <i data-lucide="sparkles" className="w-4 h-4"></i>
+                                    <span>ملاحظات عملية للتحسين</span>
+                                </div>
+                                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-slate-300">
+                                    {data.recommendations.map((rec, idx) => (
+                                        <li key={idx} className="flex items-start gap-2">
+                                            <span className="text-brand-orange font-bold">•</span>
+                                            <span>{rec}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Detailed Section Breakdown Tabs */}
+                    <div className="space-y-6">
+                        
+                        {/* Tab Switcher */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10">
+                            <button 
+                                onClick={() => setActiveTab('all')}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                                    activeTab === 'all' 
+                                        ? 'bg-brand-orange text-slate-950 shadow-md' 
+                                        : 'glass-card text-slate-300 hover:text-white'
+                                }`}
+                            >
+                                كافة الفحوصات ({data.sections.length})
+                            </button>
+                            {data.sections.map(sec => (
+                                <button 
+                                    key={sec.id}
+                                    onClick={() => setActiveTab(sec.id)}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                                        activeTab === sec.id 
+                                            ? 'bg-brand-orange text-slate-950 shadow-md' 
+                                            : 'glass-card text-slate-300 hover:text-white'
+                                    }`}
+                                >
+                                    <span>{sec.title}</span>
+                                    <span className="px-1.5 py-0.5 rounded-md bg-black/20 text-[10px]">{sec.score}%</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Section Cards Content */}
+                        <div className="space-y-6">
+                            {data.sections
+                                .filter(sec => activeTab === 'all' || activeTab === sec.id)
+                                .map(sec => (
+                                    <div key={sec.id} className="glass-panel p-6 sm:p-8 rounded-3xl space-y-6">
+                                        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-brand-navy border border-brand-border flex items-center justify-center text-brand-orange">
+                                                    <i data-lucide={sec.icon} className="w-5 h-5"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-white">{sec.title}</h3>
+                                                    <span className="text-xs text-slate-400">تقييم المكون: {sec.score} من 100</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-sm font-extrabold text-brand-orange bg-brand-orange/10 px-3 py-1 rounded-lg">
+                                                {sec.score}%
+                                            </div>
+                                        </div>
+
+                                        {/* Items List */}
+                                        <div className="space-y-3">
+                                            {sec.items.map((item, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    className={`p-4 rounded-2xl border transition-all flex items-start gap-3 ${
+                                                        item.type === 'error' 
+                                                            ? 'bg-rose-500/5 border-rose-500/20 text-rose-200' 
+                                                            : item.type === 'warning'
+                                                            ? 'bg-amber-500/5 border-amber-500/20 text-amber-200'
+                                                            : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-200'
+                                                    }`}
+                                                >
+                                                    <div className="mt-0.5">
+                                                        {item.type === 'error' && <i data-lucide="x-circle" className="w-5 h-5 text-rose-400"></i>}
+                                                        {item.type === 'warning' && <i data-lucide="alert-triangle" className="w-5 h-5 text-amber-400"></i>}
+                                                        {item.type === 'pass' && <i data-lucide="check-circle" className="w-5 h-5 text-emerald-400"></i>}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <h4 className="text-sm font-bold text-white">{item.title}</h4>
+                                                        <p className="text-xs text-slate-300 leading-relaxed">{item.desc}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+
+                    </div>
+                </div>
+            );
+        }
+
+        // Render React Application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
